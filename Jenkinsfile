@@ -14,8 +14,8 @@ pipeline {
         stage('2. 发送代码到宿主机') {
             steps {
                 sh """
-                ssh -o StrictHostKeyChecking=no root@${SSH_HOST} "rm -rf ${PROJECT_PATH}"
-                scp -r . root@${SSH_HOST}:${PROJECT_PATH}
+                ssh -o StrictHostKeyChecking=no root@${SSH_HOST} "rm -rf ${PROJECT_PATH} && mkdir -p ${PROJECT_PATH}"
+                ssh -o StrictHostKeyChecking=no root@${SSH_HOST} "cd ${PROJECT_PATH}"
                 """
             }
         }
