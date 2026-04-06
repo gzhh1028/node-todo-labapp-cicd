@@ -1,4 +1,4 @@
-FROM registry.cn-hangzhou.aliyuncs.com/library/node:12.2.0-alpine
+FROM docker.mirrors.ustc.edu.cn/library/node:12-alpine
 WORKDIR app
 COPY . .
 RUN npm install
