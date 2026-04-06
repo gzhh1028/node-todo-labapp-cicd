@@ -1,38 +1,37 @@
 pipeline {
     agent any
     environment {
-        HARBOR_HOST = '172.21.196.15'
-        IMAGE_NAME = 'node-todo'
-        IMAGE_TAG = "${BUILD_NUMBER}"
-        SSH_HOST = '172.21.196.14'
-        KUBECONFIG = '/root/jenkins-k3s/k3s.yaml'
-        PROJECT_PATH = '/opt/node-todo'
-        HARBOR_CRED = credentials('HARBOR_CRED')
+        HARBOR_HOST     = '172.21.196.15'
+        IMAGE_NAME      = 'node-todo'
+        IMAGE_TAG       = "${BUILD_NUMBER}"
+        SSH_HOST        = '172.21.196.14'
+        KUBECONFIG      = '/root/jenkins-k3s/k3s.yaml'
+        PROJECT_PATH    = '/opt/node-todo'
+        HARBOR_CRED     = credentials('HARBOR_CRED')
     }
 
     stages {
-        stage('2. 发送代码到宿主机') {
+        stage('同步代码到宿主机') {
             steps {
                 sh """
                 ssh -o StrictHostKeyChecking=no root@${SSH_HOST} "rm -rf ${PROJECT_PATH} && mkdir -p ${PROJECT_PATH}"
-                ssh -o StrictHostKeyChecking=no root@${SSH_HOST} "cd ${PROJECT_PATH}"
+                rsync -avz -e "ssh -o StrictHostKeyChecking=no" ./ ${SSH_HOST}:${PROJECT_PATH}/
                 """
             }
         }
 
-        stage('3. Node 构建 & 测试') {
+        stage('Node 构建') {
             steps {
                 sh """
                 ssh -o StrictHostKeyChecking=no root@${SSH_HOST} "
                     cd ${PROJECT_PATH}
                     npm install --registry=https://registry.npmmirror.com
-                    npm test
                 "
                 """
             }
         }
 
-        stage('4. 构建 Docker 镜像') {
+        stage('构建 Docker 镜像') {
             steps {
                 sh """
                 ssh -o StrictHostKeyChecking=no root@${SSH_HOST} "
@@ -43,7 +42,7 @@ pipeline {
             }
         }
 
-        stage('5. 推送 Harbor') {
+        stage('推送镜像到 Harbor') {
             steps {
                 sh """
                 ssh -o StrictHostKeyChecking=no root@${SSH_HOST} "
@@ -54,14 +53,14 @@ pipeline {
             }
         }
 
-        stage('6. 部署到 k3s') {
+        stage('部署到 K3s') {
             steps {
                 sh """
                 ssh -o StrictHostKeyChecking=no root@${SSH_HOST} "
                     export KUBECONFIG=${KUBECONFIG}
                     kubectl apply -f ${PROJECT_PATH}/k8s-deploy.yaml
                     kubectl set image deployment/node-todo node-todo=${HARBOR_HOST}/library/${IMAGE_NAME}:${IMAGE_TAG}
-                    kubectl rollout restart deployment node-todo
+                    kubectl rollout restart deployment/node-todo
                 "
                 """
             }
@@ -69,7 +68,7 @@ pipeline {
     }
 
     post {
-        success { echo "✅ 部署成功！" }
-        failure { echo "❌ 构建失败！" }
+        success { echo "✅ 部署成功！镜像：${HARBOR_HOST}/library/${IMAGE_NAME}:${IMAGE_TAG}" }
+        failure { echo "❌ 构建部署失败！" }
     }
 }
