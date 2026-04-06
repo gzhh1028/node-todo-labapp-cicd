@@ -15,7 +15,7 @@ pipeline {
             steps {
                 sh """
                 ssh -o StrictHostKeyChecking=no root@${SSH_HOST} "rm -rf ${PROJECT_PATH} && mkdir -p ${PROJECT_PATH}"
-                rsync -avz -e "ssh -o StrictHostKeyChecking=no" ./ ${SSH_HOST}:${PROJECT_PATH}/
+                scp -o StrictHostKeyChecking=no -r ./* root@${SSH_HOST}:${PROJECT_PATH}/
                 """
             }
         }
