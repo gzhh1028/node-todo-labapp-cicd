@@ -6,8 +6,7 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         SSH_HOST        = '172.21.196.14'
         K3S_HOST        = '172.21.196.16'
-        KUBECONFIG      = '/etc/rancher/k3s/k3s.yaml'  // ✅ 修复：K3s 真实默认路径
-        PROJECT_PATH    = '/opt/node-todo'
+        KUBECONFIG      = '/root/jenkins-k3s/k3s.yaml'  // ✅ 你真实存在的路径
         HARBOR_CRED     = credentials('HARBOR_CRED')
     }
 
@@ -15,8 +14,8 @@ pipeline {
         stage('同步代码到构建机') {
             steps {
                 sh """
-                ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${SSH_HOST} "rm -rf ${PROJECT_PATH} && mkdir -p ${PROJECT_PATH}"
-                tar -czf - . | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${SSH_HOST} "tar -xzf - -C ${PROJECT_PATH}"
+                ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${SSH_HOST} "rm -rf /opt/node-todo && mkdir -p /opt/node-todo"
+                tar -czf - . | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${SSH_HOST} "tar -xzf - -C /opt/node-todo"
                 """
             }
         }
@@ -25,7 +24,7 @@ pipeline {
             steps {
                 sh """
                 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${SSH_HOST} "
-                    cd ${PROJECT_PATH}
+                    cd /opt/node-todo
                     docker build -t ${HARBOR_HOST}/library/${IMAGE_NAME}:${IMAGE_TAG} .
                 "
                 """
@@ -43,13 +42,17 @@ pipeline {
             }
         }
 
-        // ✅ 最终 100% 可运行部署
+        // ✅ 最终最干净、不会报错的部署
         stage('部署到 K3s') {
             steps {
                 sh """
+                # 1. 把 yaml 传到 16 机器 /opt（永久保存，不删除）
+                scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null k8s-deploy.yaml root@${K3S_HOST}:/opt/
+
+                # 2. 在 16 上直接部署
                 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${K3S_HOST} "
                     export KUBECONFIG=${KUBECONFIG}
-                    kubectl apply -f <(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${SSH_HOST} 'cat ${PROJECT_PATH}/k8s-deploy.yaml')
+                    kubectl apply -f /opt/k8s-deploy.yaml
                     kubectl set image deployment/node-todo node-todo=${HARBOR_HOST}/library/${IMAGE_NAME}:${IMAGE_TAG}
                     kubectl rollout restart deployment/node-todo
                 "
