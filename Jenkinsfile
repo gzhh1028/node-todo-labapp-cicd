@@ -11,24 +11,7 @@ pipeline {
     }
 
     stages {
-        // ✅ 第一步：配置阿里云 Docker 加速（解决所有拉取镜像失败）
-        stage('配置 Docker 加速') {
-            steps {
-                sh """
-                ssh -o StrictHostKeyChecking=no root@${SSH_HOST} "
-                mkdir -p /etc/docker
-                cat > /etc/docker/daemon.json <<EOF
-{
-  \"registry-mirrors\": [\"https://yb9l06e6.mirror.aliyuncs.com\"]
-}
-EOF
-                systemctl daemon-reload
-                systemctl restart docker
-                "
-                """
-            }
-        }
-
+        // 代码同步（安全）
         stage('同步代码到宿主机') {
             steps {
                 sh """
@@ -38,6 +21,7 @@ EOF
             }
         }
 
+        // 依赖安装
         stage('Node 构建') {
             steps {
                 sh """
@@ -49,6 +33,7 @@ EOF
             }
         }
 
+        // 构建镜像（安全！不修改Docker任何配置）
         stage('构建 Docker 镜像') {
             steps {
                 sh """
@@ -60,6 +45,7 @@ EOF
             }
         }
 
+        // 推送镜像
         stage('推送镜像到 Harbor') {
             steps {
                 sh """
@@ -71,6 +57,7 @@ EOF
             }
         }
 
+        // 部署 K3s
         stage('部署到 K3s') {
             steps {
                 sh """
