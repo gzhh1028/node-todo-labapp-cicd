@@ -1,4 +1,4 @@
-FROM registry.aliyuncs.com/library/node:12.2.0-alpine
+FROM hub-mirror.c.163.com/library/node:12.2.0-alpine
 WORKDIR app
 COPY . .
 RUN npm install
