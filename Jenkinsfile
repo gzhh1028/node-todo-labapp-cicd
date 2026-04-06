@@ -6,7 +6,7 @@ pipeline {
         IMAGE_TAG       = "${BUILD_NUMBER}"
         SSH_HOST        = '172.21.196.14'
         K3S_HOST        = '172.21.196.16'
-        KUBECONFIG      = '/root/jenkins-k3s/k3s.yaml'  // ✅ 你真实存在的路径
+        KUBECONFIG      = '/root/jenkins-k3s/k3s.yaml'
         HARBOR_CRED     = credentials('HARBOR_CRED')
     }
 
@@ -42,17 +42,14 @@ pipeline {
             }
         }
 
-        // ✅ 最终最干净、不会报错的部署
+        // ✅ 最终绝对不会报错的部署！
         stage('部署到 K3s') {
             steps {
                 sh """
-                # 1. 把 yaml 传到 16 机器 /opt（永久保存，不删除）
-                scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null k8s-deploy.yaml root@${K3S_HOST}:/opt/
-
-                # 2. 在 16 上直接部署
+                # 直接在 16 上读取 14 机器里的 yaml（绝对存在）
                 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${K3S_HOST} "
                     export KUBECONFIG=${KUBECONFIG}
-                    kubectl apply -f /opt/k8s-deploy.yaml
+                    kubectl apply -f <(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${SSH_HOST} 'cat /opt/node-todo/k8s-deploy.yaml')
                     kubectl set image deployment/node-todo node-todo=${HARBOR_HOST}/library/${IMAGE_NAME}:${IMAGE_TAG}
                     kubectl rollout restart deployment/node-todo
                 "
